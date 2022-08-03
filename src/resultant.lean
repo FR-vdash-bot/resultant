@@ -298,9 +298,9 @@ linear_map.to_matrix
   (resultant_aux p q)
 
 lemma sylvester_matrix_eq (m n : ℕ) (p : degree_le R m) (q : degree_le R n) :
-  sylvester_matrix m n p q = λ i j, if ↑j < n
+  sylvester_matrix m n p q = matrix.of (λ (i : fin (n + m)) (j : fin (n + m)), if ↑j < n
     then (↑p * X ^ (j : ℕ)).coeff i
-    else (↑q * X ^ (j - n : ℕ)).coeff i := by
+    else (↑q * X ^ (j - n : ℕ)).coeff i) := by
 { nontriviality R,
   let v₁ := ((degree_lt.basis_monomials R n).prod (degree_lt.basis_monomials R m)).reindex
     fin_sum_fin_equiv,
@@ -309,7 +309,8 @@ lemma sylvester_matrix_eq (m n : ℕ) (p : degree_le R m) (q : degree_le R n) :
   rw [sylvester_matrix, matrix.to_lin_to_matrix],
   apply v₁.ext, intros i, rw [matrix.to_lin_self, resultant_aux_apply, ← set_like.coe_eq_coe,
     set_like.coe_mk, submodule.coe_sum, basis.reindex_apply, degree_lt.coe_basis_monomials],
-  conv_rhs { congr, skip, funext, dsimp only, rw [submodule.coe_smul, set_like.coe_mk], },
+  conv_rhs { congr, skip, funext,
+    dsimp only, rw [submodule.coe_smul, matrix.of_apply, set_like.coe_mk], },
   cases lt_or_ge (i : ℕ) n with h h,
   { have : i = fin.cast_add m (⟨i, h⟩ : fin n) := by rw [fin.cast_add_mk, fin.eta],
     rw [this, fin_sum_fin_equiv_symm_apply_cast_add, basis.prod_apply_inl_fst,
@@ -334,7 +335,7 @@ lemma sylvester_matrix_apply (m n : ℕ) (p : degree_le R m) (q : degree_le R n)
   (i j : fin (n + m)) : sylvester_matrix m n p q i j = if ↑j < n
     then (↑p * X ^ (j : ℕ)).coeff i
     else (↑q * X ^ (j - n : ℕ)).coeff i :=
-(sylvester_matrix_eq m n p q).symm ▸ rfl
+by rw [sylvester_matrix_eq, matrix.of_apply]
 
 def resultant' : ∀ (m n : with_bot ℕ), degree_le R m → degree_le R n → R
 | (m : ℕ) (n : ℕ) := λ p q, (sylvester_matrix m n p q).det
@@ -401,9 +402,9 @@ by apply resultant'_mk_congr hm hn rfl rfl
   f (resultant' m n p q) = resultant' m n (degree_le.map f p) (degree_le.map f q) := by
 { cases m; cases n; simp ! only [map_zero],
   convert_to f (matrix.det _) = matrix.det _,
-  simp_rw [ring_hom.map_det, sylvester_matrix_eq, ring_hom.map_matrix_apply,
-    matrix.map], congr' 1, funext i j, split_ifs; simp_rw [← coeff_map,
-    polynomial.map_mul, polynomial.map_pow, polynomial.map_X, degree_le.map, submodule.coe_mk], }
+  simp_rw [ring_hom.map_det, sylvester_matrix_eq, ring_hom.map_matrix_apply], congr' 1, funext i j,
+  simp_rw [matrix.map_apply, matrix.of_apply], split_ifs; simp_rw [← coeff_map, polynomial.map_mul,
+    polynomial.map_pow, polynomial.map_X, degree_le.map, submodule.coe_mk], }
 
 @[simps apply] def fin_add_comm {m n : ℕ} : fin (m + n) ≃ fin (n + m) :=
 ⟨ λ x, ⟨x, add_comm m n ▸ x.2⟩, λ x, ⟨x, add_comm n m ▸ x.2⟩,
@@ -748,15 +749,15 @@ lemma resultant'_one_left (m n : ℕ) (q : degree_le R n) :
   suffices h : ∀ (i j : fin (n + m)), j < i → (sylvester_matrix m n
     ⟨1, mem_degree_le.mpr (degree_one_le.trans (with_bot.coe_le_coe.mpr zero_le'))⟩ q) i j = 0,
   { rw [matrix.det_of_upper_triangular _ h, sylvester_matrix_eq], dsimp only [subtype.coe_mk],
-    rw [fin.prod_univ_eq_prod_range (λ i, ite (i < n) ((1 * X ^ i : R[X]).coeff i)
-      ((↑q * X ^ (i - n) : R[X]).coeff i)), finset.prod_range_add], dsimp only,
+    simp_rw [matrix.of_apply, fin.prod_univ_eq_prod_range (λ i, ite (i < n)
+      ((1 * X ^ i : R[X]).coeff i) ((↑q * X ^ (i - n) : R[X]).coeff i)), finset.prod_range_add],
     convert_to (∏ (i : ℕ) in finset.range n, (1 * X ^ i).coeff i) *
       ∏ (x : ℕ) in finset.range m, (↑q * X ^ (n + x - n)).coeff (n + x) = _, congr' 1,
     { apply finset.prod_congr rfl, intros x hx, rw [if_pos (finset.mem_range.mp hx)], },
     { apply finset.prod_congr rfl, intros x hx, rw [if_neg (le_self_add).not_lt], },
     simp_rw [add_tsub_cancel_left, coeff_mul_X_pow, one_mul, coeff_X_pow_self],
     rw [finset.prod_const_one, one_mul, finset.prod_const, finset.card_range], },
-  intros i j hij, rw [sylvester_matrix_eq], dsimp only [subtype.coe_mk], split_ifs with hn,
+  intros i j hij, rw [sylvester_matrix_apply], dsimp only [subtype.coe_mk], split_ifs with hn,
   { simp_rw [one_mul, coeff_X_pow, subtype.coe_inj, if_neg hij.ne.symm], },
   { push_neg at hn, rw [← subtype.coe_lt_coe] at hij,
     rw [← add_tsub_cancel_of_le (hn.trans hij.le)],
@@ -789,12 +790,12 @@ lemma resultant'_shrink_left' (m n o : ℕ) (p : degree_le R m) (q : degree_le R
   have h₁₁ : (matrix.reindex this this (sylvester_matrix _ _ ⟨↑p, _⟩ q)).to_blocks₁₁ =
     sylvester_matrix _ _ p q,
   { ext, simp_rw [matrix.to_blocks₁₁, matrix.reindex_apply, matrix.minor_apply,
-      equiv.symm_symm, equiv.trans_apply],
+      equiv.symm_symm, equiv.trans_apply, matrix.of_apply],
     rw [sylvester_matrix_apply, sylvester_matrix_apply, subtype.coe_mk],
     simp_rw [hl], },
   have h₂₁ : (matrix.reindex this this (sylvester_matrix _ _ ⟨↑p, _⟩ q)).to_blocks₂₁ = 0,
   { ext, simp_rw [pi.zero_apply, matrix.to_blocks₂₁, matrix.reindex_apply, matrix.minor_apply,
-      equiv.symm_symm, equiv.trans_apply],
+      equiv.symm_symm, equiv.trans_apply, matrix.of_apply],
     rw [sylvester_matrix_apply, subtype.coe_mk],
     simp_rw [hl, hr],
     nontriviality R,
@@ -809,8 +810,8 @@ lemma resultant'_shrink_left' (m n o : ℕ) (p : degree_le R m) (q : degree_le R
     ⟨↑p, mem_degree_le.mpr ((mem_degree_le.mp p.2).trans (with_bot.coe_le_coe.mpr le_self_add))⟩
     q)).to_blocks₂₂ i j = 0,
   { intros i j hij, simp_rw [matrix.to_blocks₂₂, matrix.reindex_apply, matrix.minor_apply,
-      equiv.symm_symm, equiv.trans_apply], rw [sylvester_matrix_apply, subtype.coe_mk],
-    simp_rw [hr],
+      equiv.symm_symm, equiv.trans_apply, matrix.of_apply],
+    rw [sylvester_matrix_apply, subtype.coe_mk], simp_rw [hr],
     rw [add_assoc, if_neg le_self_add.not_lt],
     nontriviality R,
     apply coeff_eq_zero_of_nat_degree_lt, apply nat_degree_mul_le.trans_lt,
@@ -818,7 +819,7 @@ lemma resultant'_shrink_left' (m n o : ℕ) (p : degree_le R m) (q : degree_le R
     apply add_lt_add_of_le_of_lt (nat_degree_le_of_degree_le (mem_degree_le.mp q.2)),
     rwa [add_lt_add_iff_left, subtype.coe_lt_coe], },
   rw [matrix.det_of_upper_triangular _ h₂₂, sylvester_matrix_eq], dsimp only [subtype.coe_mk],
-  simp_rw [matrix.to_blocks₂₂, matrix.reindex_apply, matrix.minor_apply,
+  simp_rw [matrix.to_blocks₂₂, matrix.reindex_apply, matrix.minor_apply, matrix.of_apply,
     equiv.symm_symm, equiv.trans_apply, hr],
   simp_rw [add_assoc, if_neg le_self_add.not_lt, add_tsub_cancel_left, coeff_mul_X_pow,
     finset.prod_const, finset.card_fin], }
@@ -843,7 +844,7 @@ lemma resultant'_shrink_right (m n₁ n₂ : ℕ) (hn : n₂ ≤ n₁) (p : degr
   resultant' m n₁ p ⟨q, hq₁⟩ =
     (-1) ^ (m * (n₁ - n₂)) * (p : R[X]).coeff m ^ (n₁ - n₂) * resultant' m n₂ p ⟨q, hq₂⟩ := by
 { rw [resultant'_comm, resultant'_shrink_left _ _ _ hn p hq₁ hq₂, resultant'_comm _ _ p],
-  ring_nf, rw [← pow_add, ← mul_add, add_tsub_cancel_of_le hn], ring, }
+  ring_nf, rw [← pow_add, ← add_mul, add_tsub_cancel_of_le hn], ring, }
 
 private
 lemma resultant'_mul_left_field' {R : Type*} [field R] (m₁ m₂ n : ℕ)
@@ -996,7 +997,7 @@ lemma resultant_mul_right [no_zero_divisors R] (p q₁ q₂ : R[X]) :
   exact resultant'_congr' rfl degree_mul, }
 
 @[simps apply]
-def resultant_left (R : Type*) [comm_ring R] [no_zero_divisors R]
+def resultant_left {R : Type*} [comm_ring R] [no_zero_divisors R]
   {q : R[X]} (q0 : q ≠ 0) : R[X] →*₀ R :=
 { to_fun    := λ p, resultant p q,
   map_zero' := resultant_zero_left q,
@@ -1004,7 +1005,7 @@ def resultant_left (R : Type*) [comm_ring R] [no_zero_divisors R]
   map_mul'  := λ p₁ p₂, resultant_mul_left p₁ p₂ q, }
 
 @[simps apply]
-def resultant_right (R : Type*) [comm_ring R] [no_zero_divisors R]
+def resultant_right {R : Type*} [comm_ring R] [no_zero_divisors R]
   {p : R[X]} (p0 : p ≠ 0) : R[X] →*₀ R :=
 { to_fun    := λ q, resultant p q,
   map_zero' := resultant_zero_right p,
